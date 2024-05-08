@@ -6,10 +6,131 @@ from torch import nn
 import numpy as np
 import os
 from tqdm import tqdm
+from typing import Dict
 
-def initialize_weights(m):
-    if hasattr(m, 'weight') and m.weight.dim() > 1:
-        nn.init.xavier_uniform_(m.weight.data)
+def create_source_mask(src, source_pad_id = 0, DEVICE='cuda:0'):
+    """
+    Create a mask for the source sequence.
+
+    Args:
+        src (torch.Tensor): The source sequence tensor.
+        source_pad_id (int, optional): The padding value for the source sequence. Defaults to 0.
+        DEVICE (str, optional): The device to be used for computation. Defaults to 'cuda:0'.
+
+    Returns:
+        torch.Tensor: The source mask tensor, and the source padding mask.
+    """
+
+    src_seq_len = src.shape[1]
+    src_mask = torch.zeros((src_seq_len, src_seq_len), device=DEVICE)
+    source_padding_mask = (src == source_pad_id)
+    return src_mask, source_padding_mask
+
+def generate_square_subsequent_mask(tgt_seq_len, DEVICE='cuda:0'):
+    """
+    Generates a square subsequent mask for self-attention mechanism.
+
+    Args:
+        sz (int): The size of the mask.
+        DEVICE (str, optional): The device to be used for computation. Defaults to 'cuda:0'.
+
+    Returns:
+        torch.Tensor: The square subsequent mask.
+
+    """
+    mask = (torch.triu(torch.ones((tgt_seq_len, tgt_seq_len), device=DEVICE)) == 1).transpose(0, 1)
+    mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
+    return mask
+
+
+def create_target_mask(tgt, target_pad_id = 0, DEVICE='cuda:0'):
+    """
+    Create a mask for the target sequence.
+
+    Args:
+        tgt (torch.Tensor): The target sequence tensor.
+        target_pad_id (int, optional): The padding value for the target sequence. Defaults to 0.
+        DEVICE (str, optional): The device to be used for computation. Defaults to 'cuda:0'.
+
+    Returns:
+        torch.Tensor: The target mask tensor.
+    """
+
+    tgt_seq_len = tgt.shape[1]
+    tgt_mask = generate_square_subsequent_mask(tgt_seq_len, DEVICE)
+    tgt_padding_mask = (tgt == target_pad_id)
+    return tgt_mask, tgt_padding_mask
+
+def create_mask(src, tgt, source_pad_id = 0, target_pad_id = 0, DEVICE='cuda:0'):
+    """
+    Create masks for the source and target sequences.
+
+    Args:
+        src (torch.Tensor): The source sequence tensor.
+        tgt (torch.Tensor): The target sequence tensor.
+        source_pad_id (int, optional): The padding value for the source sequence. Defaults to 0.
+        target_pad_id (int, optional): The padding value for the target sequence. Defaults to 0.
+        DEVICE (str, optional): The device to be used for computation. Defaults to 'cuda:0'.
+
+    Returns:
+        torch.Tensor: The source mask tensor.
+        torch.Tensor: The target mask tensor.
+        torch.Tensor: The source padding mask tensor.
+        torch.Tensor: The target padding mask tensor.
+    """
+
+    src_mask, source_padding_mask = create_source_mask(src, source_pad_id, DEVICE)
+    tgt_mask, target_padding_mask = create_target_mask(tgt, target_pad_id, DEVICE)
+
+    return src_mask, tgt_mask, source_padding_mask, target_padding_mask
+
+def get_sequences(generator , dataloader : torch.utils.data.dataloader.DataLoader,  source_pad_id : int = 0, tgt_tokens_to_ids : Dict[str, int] =  None, max_len : int = 150,  DEVICE : str ='cuda:0'):
+    """
+    return relevant forcasted and sequences made by the generator on the dataset.
+
+    Args:
+        generator (torch.nn.Module): The generator to be evaluated.
+        val_dataloader (torch.utils.data.DataLoader): The validation dataloader.
+        source_pad_id (int, optional): The padding token ID for the source input. Defaults to 0.
+        DEVICE (str, optional): The device to run the evaluation on. Defaults to 'cuda:0'.
+        tgt_tokens_to_ids (dict, optional): A dictionary mapping target tokens to their IDs. Defaults to None.
+        max_len (int, optional): The maximum length of the generated target sequence. Defaults to 100.
+    Returns:
+        List[List[int]], List[List[int]]: The list of relevant and forecasted sequences.
+    """
+
+    generator.eval()
+    pred_trgs = []
+    targets = []
+
+    with torch.inference_mode():
+        for source_input_ids, target_input_ids in tqdm(dataloader, desc='scoring'):
+            source_input_ids, target_input_ids = source_input_ids.to(DEVICE),target_input_ids.to(DEVICE)
+            src_mask, source_padding_mask = create_source_mask(source_input_ids, source_pad_id, DEVICE) 
+            memory = generator.batch_encode(source_input_ids, src_mask, source_padding_mask)
+            pred_trg = torch.tensor(tgt_tokens_to_ids['BOS'], device= DEVICE).repeat(source_input_ids.size(0)).unsqueeze(1)
+            # generate target sequence one token at a time at batch level
+            for i in range(max_len):
+                trg_mask = generate_square_subsequent_mask(i+1, DEVICE)
+                output = generator.decode(pred_trg, memory, trg_mask)
+                probs = generator.out(output[:, -1])
+                pred_tokens = torch.argmax(probs, dim=1)
+                eov_mask = pred_tokens == tgt_tokens_to_ids['EOV']
+                if eov_mask.any():
+                    # extend with sequences that have reached EOV
+                    pred_trgs.extend(torch.cat((pred_trg[eov_mask],torch.tensor(tgt_tokens_to_ids['EOV'], device = DEVICE).unsqueeze(0).repeat(eov_mask.sum(), 1)),dim = -1).cpu().tolist())
+                    targets.extend(target_input_ids[eov_mask].cpu().tolist())
+                    # store corresponding target sequences
+                    target_input_ids = target_input_ids[~eov_mask]
+                    # break if all have reached EOV
+                    if eov_mask.all():
+                        break  
+                    pred_trg = torch.cat((pred_trg[~eov_mask], pred_tokens[~eov_mask].unsqueeze(1)), dim=1)
+                    memory = memory[~eov_mask]
+                else:
+                    pred_trg = torch.cat((pred_trg, pred_tokens.unsqueeze(1)), dim=1)
+                
+    return pred_trgs, targets
 
         
 def get_gen_loss(crit_fake_pred):
@@ -23,24 +144,15 @@ def get_crit_loss(crit_fake_pred, crit_real_pred):
     return crit_loss
 
 
-def initializeClinicalGAN(input_dim, output_dim, hid_dim,pf_dim,gen_layers,gen_heads,dis_heads,dis_layers,dropout,lr,n_epochs,alpha,clip,loader,data,config,path,gen_clip ,device):
-    
-    # get the data
+def initializeClinicalGAN(input_dim, output_dim, hid_dim,pf_dim,gen_layers,gen_heads,dis_heads,dis_layers,dropout,lr,n_epochs,alpha,clip,loader,data,config ,gen_clip ,device):
 
-    inp_max_len,out_max_len,pad_idx = data['maxInp'],data['maxOut'] , data['codeMap']['types']['PAD']
-    enc = Encoder(input_dim,hid_dim,gen_layers,gen_heads,pf_dim,dropout,inp_max_len).to(device)
-    dec = Decoder(output_dim,hid_dim,gen_layers,gen_heads,pf_dim,dropout,out_max_len).to(device)
-    
-    gen = Generator(enc, dec, pad_idx, pad_idx).to(device)
-    disc = Discriminator(input_dim, hid_dim, dis_layers, dis_heads, pf_dim, dropout,pad_idx,inp_max_len+out_max_len).to(device)
-
-    gen_opt = torch.optim.Adam(gen.parameters(), lr = lr)
+    gen_opt = torch.optim.Adam(generator.parameters(), lr = lr)
     disc_opt = torch.optim.SGD(disc.parameters(), lr = lr)
     
     lr_schedulerG = NoamLR(gen_opt, warmup_steps=config['warmup_steps'],factor= config['factor'],model_size=config['hid_dim'])
     lr_schedulerD = NoamLR(disc_opt, warmup_steps=config['warmup_steps'],factor= config['factor'],model_size=config['hid_dim'])
 
-    gen.apply(initialize_weights)
+    generator.apply(initialize_weights)
     disc.apply(initialize_weights)
     
     criterion = LabelSmoothingCrossEntropy(epsilon = config['eps'], ignore_index = pad_idx)
@@ -49,64 +161,35 @@ def initializeClinicalGAN(input_dim, output_dim, hid_dim,pf_dim,gen_layers,gen_h
     modelHypermaters = {}
 
     
-    modelHypermaters['trainloader']=loader['trainLoader']
-    modelHypermaters['testloader']=loader['testLoader']
-    modelHypermaters['valloader']=loader['valLoader']
+    modelHypermaters['trainloader'] = loader['trainLoader']
+    modelHypermaters['testloader'] = loader['testLoader']
+    modelHypermaters['valloader'] = loader['valLoader']
     
-    modelHypermaters['encObject']=enc
-    modelHypermaters['decObject']=dec
-    modelHypermaters['optimizer_D']=disc_opt
-    modelHypermaters['optimizer_G']=gen_opt
-    modelHypermaters['genObject']=gen
-    modelHypermaters['discObject']=disc
+    modelHypermaters['optimizer_D'] = disc_opt
+    modelHypermaters['optimizer_G'] = gen_opt
+    modelHypermaters['genObject'] = gen
+    modelHypermaters['discObject'] = disc
     # to access the mask function inside the generator class
-    modelHypermaters['criterion']=criterion
+    modelHypermaters['criterion'] = criterion
     
-    modelHypermaters['device']=device
-    modelHypermaters['config']=config
-    
-    modelHypermaters['n_epochs']=n_epochs
-    modelHypermaters['alpha']=alpha
-    modelHypermaters['clip']=clip
+    modelHypermaters['n_epochs'] = n_epochs
+    modelHypermaters['alpha'] = alpha
+    modelHypermaters['clip'] = clip
     
     modelHypermaters['reverseOutTypes'] = data['codeMap']['reverseOutTypes'] 
     modelHypermaters['types'] = data['codeMap']['types'] 
     
-    modelHypermaters['path'] = path
-    modelHypermaters['gen_clip'] =gen_clip
-    modelHypermaters['lr_schedulerG']=lr_schedulerG
-    modelHypermaters['lr_schedulerD']=lr_schedulerD
+    modelHypermaters['gen_clip'] = gen_clip
+    modelHypermaters['lr_schedulerG'] = lr_schedulerG
+    modelHypermaters['lr_schedulerD'] = lr_schedulerD
     return modelHypermaters
     
     
-def trainCGAN(modelHypermaters):
-    
-    
-    trainLoader = modelHypermaters['trainloader']
-    testLoader= modelHypermaters['testloader']
-    valLoader= modelHypermaters['valloader']
-    
-    enc= modelHypermaters['encObject']
-    dec= modelHypermaters['decObject']
-    disc_opt =modelHypermaters['optimizer_D']
-    gen_opt =modelHypermaters['optimizer_G']
-    gen= modelHypermaters['genObject']
-    disc= modelHypermaters['discObject']
-    
-    criterion= modelHypermaters['criterion']
-    
-    device = modelHypermaters['device']
-    config= modelHypermaters['config']
-     
-    n_epochs = modelHypermaters['n_epochs']
+def trainCGAN(disc_opt, gen_opt, lr_schedulerG,  lr_schedulerD, generator, discriminator, criterion, valLoader, n_epochs, trainLoader, alpha, disc_clip, gen_clip):
+         
     alpha = modelHypermaters['alpha']
     clip = modelHypermaters['clip']
-    reverseOutTypes = modelHypermaters['reverseOutTypes']
     gen_clip= modelHypermaters['gen_clip']
-    lr_schedulerG = modelHypermaters['lr_schedulerG']
-    lr_schedulerD = modelHypermaters['lr_schedulerD']
-
-    
     
     crit_repeats =5
     vLoss = []
@@ -114,8 +197,8 @@ def trainCGAN(modelHypermaters):
     for epoch in range(n_epochs):
         totalGen = 0
         totalDis = 0
-        gen.train()
-        disc.train()
+        generator.train()
+        discriminator.train()
         lr_schedulerG.step()
         lr_schedulerD.step()
 
@@ -125,34 +208,29 @@ def trainCGAN(modelHypermaters):
             DisLoss =0
             for _ in range(crit_repeats):
                 disc_opt.zero_grad()
-                output, _ = gen(src, trg[:,:-1])
-                _,predValues = torch.max(output,2)
-                real = joinrealData(convertOutput(pair,reverseOutTypes))
-                fake = joinfakeData(pair,convertGenOutput(predValues.tolist(),reverseOutTypes))
-                #print(f"real : {real.shape} \n fake : {fake.shape}  \n predValues:{predValues}")
-                fake_mask =  gen.make_src_mask(fake)
-                real_mask = gen.make_src_mask(real)
+                # get sequences from generator
                 real, fake, fake_mask, real_mask = real.to(device), fake.to(device) , fake_mask.to(device), real_mask.to(device)
 
-                crit_fake_pred = disc(fake,fake_mask)
-                crit_real_pred = disc(real, real_mask)
+                crit_fake_pred = discriminator(fake,fake_mask)
+                crit_real_pred = discriminator(real, real_mask)
+                
                 disc_loss = get_crit_loss(crit_fake_pred, crit_real_pred)
                 DisLoss += disc_loss.item()/crit_repeats
                 disc_loss.backward(retain_graph=True)
                 disc_opt.step()
 
-                for parameters in disc.parameters():
-                    parameters.data.clamp_(-clip, clip)
+                torch.nn.utils.clip_grad_value_(discriminator.parameters(), disc_clip)
+
             totalDis += DisLoss
             ## Update generator ##
             gen_opt.zero_grad()
-            output, _ = gen(src, trg[:,:-1])
+            output, _ = generator(src, trg[:,:-1])
             _,predValues = torch.max(output,2)
             fake = joinfakeData(pair,convertGenOutput(predValues.tolist(),reverseOutTypes))
-            fake_mask =  gen.make_src_mask(fake)
+            fake_mask =  generator.make_src_mask(fake)
             fake, fake_mask =fake.to(device) , fake_mask.to(device)
-            #print(f"gen training fake :{predValues}")
-            disc_fake_pred = disc(fake,fake_mask)
+            #print(f"generator training fake :{predValues}")
+            disc_fake_pred = discriminator(fake,fake_mask)
             gen_loss1 = get_gen_loss(disc_fake_pred)
 
             output_dim = output.shape[-1]
@@ -163,13 +241,13 @@ def trainCGAN(modelHypermaters):
             gen_loss = (alpha * gen_loss1)  +  gen_loss2
             totalGen += gen_loss.item()
             gen_loss.backward()
-            torch.nn.utils.clip_grad_norm_(gen.parameters(), gen_clip)
+            torch.nn.utils.clip_grad_norm_(generator.parameters(), gen_clip)
             gen_opt.step()
             #epoch_loss = gen_loss.item() + disc_loss.item()
         tLoss.append(totalGen/len(trainLoader))
         ## validating
 
-        valid_loss = evaluate(gen, valLoader, criterion,device)
+        valid_loss = evaluate(generator, valLoader, criterion,device)
         vLoss.append(valid_loss)
         
 

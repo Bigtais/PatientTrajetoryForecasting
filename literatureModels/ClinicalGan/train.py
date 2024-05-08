@@ -24,10 +24,6 @@ def trainWithoutTune(config,data,checkpoint_dir=None, device = None):
     hid_dim =config["hid_dim"]
     pf_dim =config["pf_dim"]
     batch_size = config['batch_size']
-    isdataparallel = config["isdataparallel"]
-
-    modelFileName = config["fileName"]
-    path = os.path.join("models","ClinicalGAN",modelFileName)
     dropout = config["dropout"]
     lr = config["lr"]
     gen_layers = config["gen_layers"]
@@ -44,7 +40,7 @@ def trainWithoutTune(config,data,checkpoint_dir=None, device = None):
     
     modelHypermaters = initializeClinicalGAN(input_dim, output_dim, hid_dim,pf_dim,gen_layers,
                                              gen_heads,dis_heads,dis_layers, dropout,lr,
-                                             n_epochs,alpha,clip,batch_size,loader,data,config,path,gen_clip,isdataparallel, device)
+                                             n_epochs,alpha,clip,batch_size,loader,data,config ,gen_clip, device)
     trainCGAN(modelHypermaters, checkpoint_dir)
     
     return modelHypermaters
@@ -56,6 +52,9 @@ def run(config,data,checkpoint_dir=None):
     print("\n Training has been finished.")
     return modelHypermaters
 
+generator = torch.nn.Transformer(d_model=512, nhead=8, num_encoder_layers=3, num_decoder_layers=3, dim_feedforward=2048,
+                      dropout=0.1, activation=<function relu>, custom_encoder=None, custom_decoder=None,
+                      layer_norm_eps=1e-05, batch_first=True, norm_first=False, bias=True, device=None, dtype=None)
 
 
 parser.add_argument('--learning_rate',default=4e-4, type=float,help="learning rate of the model")
@@ -75,9 +74,10 @@ parser.add_argument('--gen_heads',default=8, type=int,help="Total number of mult
 parser.add_argument('--disc_heads',default=4, type=int,help="Total number of multi-head in Discriminator")
 parser.add_argument('--batch_size',default=4, type=int,help="batch size to be used for training the model")
 
-parser.add_argument('--isdataparallel',default=False, type=int,help="if you have more than two gpu's, use dataparallization")
 parser.add_argument('--hid_dim',default=256, type=int,help="Embedding dimension of both Generator and discriminator")
+
 parser.add_argument('--pf_dim',default=512, type=int,help="Hidden dimension of both Generator and discriminator")
+
 #parser.add_argument('--istune',default=False, type=int,help="if you are trying to find optimal values, use tune function")
 parser.add_argument('--warmup_steps',default=30, type=int,help="warmp up steps for learning rate")
 parser.add_argument('--labelSmoothing',default=0.0, type=float,help="label smoothing value for reducing overfitting")
