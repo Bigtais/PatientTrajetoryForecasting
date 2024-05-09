@@ -98,16 +98,24 @@ class Generator(nn.Module):
                             self.positional_encoding(self.src_tok_emb(src)),  mask=src_mask, src_key_padding_mask=src_key_padding_mask)
     # No need for batch_decode as we're generating one token at a time
 
-
+'''d_model, nhead, dim_feedforward=2048, dropout=0.1, activation=<function relu>, layer_norm_eps=1e-05, batch_first=False, norm_first=False, bias=True, device=None, dtype=Non'''
 class Discriminator(nn.Module):
-    def __init__(self, emb_size, dim_feedforward = 2048, dropout = 0.1, num_layers = 3):
+    def __init__(self, vocab_size, d_model, nhead, dim_feedforward = 2048, dropout = 0.1, num_layers = 3):
         super(Discriminator, self).__init__()
-        self.Encoder = nn.TransformerEncoder(nn.TransformerEncoderLayer(d_model = emb_size, nhead = 8, dim_feedforward = dim_feedforward, dropout = dropout), num_layers)
-        self.classifier = nn.Linear(emb_size, 1)
+        self.tok_emb = TokenEmbedding(vocab_size, d_model)
 
-    def forward(self, x):
+        self.positional_encoding = PositionalEncoding(d_model, dropout = dropout, maxlen = vocab_size + 1)
+        self.Encoder = nn.TransformerEncoder(nn.TransformerEncoderLayer(d_model, nhead, dim_feedforward, dropout, batch_first=True, norm_first=True), num_layers)
+        self.classifier = nn.Linear(d_model, 1)
+
+    def forward(self, x: torch.Tensor,):
+        x = self.positional_encoding(self.tok_emb(x))
         x = self.Encoder(x)
-        x = x.mean(dim = 1)
-        return self.classifier(x)
+        x = self.classifier(x.mean(dim=1))
+        return x
+    
+    def batch_encode(self, src: torch.Tensor, src_mask: torch.Tensor, src_key_padding_mask: torch.Tensor):
+        return self.transformer.encoder(
+                            self.positional_encoding(self.src_tok_emb(src)),  mask=src_mask, src_key_padding_mask=src_key_padding_mask)
     
 # Discriminator Network

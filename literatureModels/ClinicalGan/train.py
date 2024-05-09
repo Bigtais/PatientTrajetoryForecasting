@@ -11,12 +11,12 @@ import argparse
 import warnings
 warnings.filterwarnings("ignore")
 parser = argparse.ArgumentParser()
-
+from model import Generator, Discriminator, initializeClinicalGAN, trainCGAN
     #to do
     # load data
     # adapt model to new pytorch version, and training loop
 
-def trainWithoutTune(config,data,checkpoint_dir=None, device = None):
+def trainWithoutTune(config, data, data_config, checkpoint_dir=None, device = None):
     
     input_dim =len(data['codeMap']['types'])
     output_dim = len(data['codeMap']['outTypes'])
@@ -41,7 +41,19 @@ def trainWithoutTune(config,data,checkpoint_dir=None, device = None):
     modelHypermaters = initializeClinicalGAN(input_dim, output_dim, hid_dim,pf_dim,gen_layers,
                                              gen_heads,dis_heads,dis_layers, dropout,lr,
                                              n_epochs,alpha,clip,batch_size,loader,data,config ,gen_clip, device)
-    trainCGAN(modelHypermaters, checkpoint_dir)
+    
+
+
+    generator = Generator(num_encoder_layers = config.gen_nlayers, num_decoder_layers = config.gen_nlayers,
+                                      emb_size = config.dim_per_head * config.nheads, nhead = config.gen_nheads, 
+                                      src_vocab_size = data_config.source_vocab_size, tgt_vocab_size = data_config.target_vocab_size,
+                                      dim_feedforward = config.ffn_hid_dim,
+                                      dropout = config.dropout)
+    
+
+    discriminator = Discriminator(data_config.target_vocab_size, config.disc_nhead * config.dim_per_head , config.disc_nheads, config.dim_ffd, config.dropout, num_layers = config.disc_nlayers)
+
+    trainCGAN(modelHypermaters, checkpoint_dir, generator, discriminator)
     
     return modelHypermaters
 
