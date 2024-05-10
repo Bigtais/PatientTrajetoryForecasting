@@ -376,8 +376,6 @@ def get_data_loaders(train_batch_size=128, eval_batch_size=128, pin_memory=True,
 
     source_sequences, target_sequences, ___ , ____ = load_data(train_data_path['processed_data_path'], processed_data = True)
 
-    print('Getting optimial embedding size')
-
     data_and_properties = get_optimal_embedding_size(source_sequences, target_sequences)
 
     if data_and_properties['old_to_new_ids_target'] is not None:
