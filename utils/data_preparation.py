@@ -465,9 +465,9 @@ def display_code_stats(adDx ,adPx,adDrug):
     print(f" Total Number of all codes {countCodes(adDx,adPx,adDrug) }")
 
 
-    print(f" average Number of procedure code per visit {list_avg_visit(adPx)}")
-    print(f" average Number of diagnosis code per visit {list_avg_visit(adDx)}")
-    print(f" average Number of drug code per visit {list_avg_visit(adDrug)}")
+    print(f" average Number of procedure code per visit {list_avg_visit(adPx):.2f}")
+    print(f" average Number of diagnosis code per visit {list_avg_visit(adDx):.2f}")
+    print(f" average Number of drug code per visit {list_avg_visit(adDrug):.2f}")
 
     print(f" Min. and max. Number of diagnosis code per admission {min_max_codes(adDx)}")
     print(f" Min. and max. Number of procedure code  per admission{min_max_codes(adPx)}")
@@ -563,7 +563,7 @@ def build_data(subject_idAdmMap : Dict[int, List[int]], adDx: Dict[int, List[int
     
     adPx, adDx, adDrug = map(lambda d: defaultdict(list, d), (adPx, adDx, adDrug)) # add default [] for missing values
 
-    print(f'Building admission-Visits mapping & filtering patients with less than {minVisits} ')
+    print(f'Building admission-Visits mapping & filtering patients with less than {minVisits} visits')
     pidSeqMap = {}
     
     skipped = 0 
