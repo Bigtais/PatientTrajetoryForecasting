@@ -141,7 +141,7 @@ def get_embedding_size(max_unique : int, len_unique : int, unique_data : set, mu
 
 
 
-def enforce_reproducibility(use_seed :Optional[int] = None) -> int:
+def enforce_reproducibility(seed :Optional[int] = None, deterministic : bool = False):
     """
     enforce reproducibility by setting the seed for all random number generators
     Args:
@@ -149,7 +149,7 @@ def enforce_reproducibility(use_seed :Optional[int] = None) -> int:
     Returns:
         seed (int): the seed used
     """
-    seed = use_seed if use_seed is not None else random.randint(1, 1000000)
+    seed = seed if seed is not None else random.randint(1, 1000000)
     print(f"Using seed: {seed}")
 
     random.seed(seed)    # python RNG
@@ -158,7 +158,7 @@ def enforce_reproducibility(use_seed :Optional[int] = None) -> int:
     # pytorch RNGs
     torch.manual_seed(seed)          # cpu + cuda
     torch.cuda.manual_seed_all(seed) # multi-gpu - can be called without gpus
-    if use_seed: # slower speed! https://pytorch.org/docs/stable/notes/randomness.html#cuda-convolution-benchmarking
+    if deterministic: # slower speed! https://pytorch.org/docs/stable/notes/randomness.html#cuda-convolution-benchmarking
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark     = False
 
