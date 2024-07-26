@@ -16,9 +16,13 @@ def test_format_data_wnotes(subject_id_hadm_id_map_notes: Dict[int, List[int]], 
         else:
             pass 
 
-
 def test_format_data_hospital_ids(notes_hadm_id: List[List[int]], source_target_sequences: Tuple[List[List[int]]]):
     assert len(notes_hadm_id) == len(source_target_sequences), "the lenght of the formated hospital ids isn't the same as that of source target sequences"
 
     for i in range(len(notes_hadm_id)):
-        assert len(notes_hadm_id[i]) == len(source_target_sequences[i][0]), "the formated hospital ids do not follow the same or as that of source target sequences"
+        assert len(notes_hadm_id[i]) == len(source_target_sequences[i][0]), "the formated hospital ids do have the same lenght or as that of source target sequences"
+
+
+def test_generator(loader):
+    batch = next(iter(loader))
+    assert batch['tokenized_notes']['input_ids'].size(0) == sum(x for x in batch['hospital_ids_lens']), "hospital_ids not correctly concatenated"
