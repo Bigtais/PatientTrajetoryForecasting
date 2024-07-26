@@ -51,12 +51,6 @@ from einops import rearrange
 from transformers.activations import ACT2FN
 from transformers.models.bert.modeling_bert import BertPreTrainedModel
 
-try:
-    import flash_attn_triton as flash_attn_triton
-    flash_attn_qkvpacked_func = flash_attn_triton.flash_attn_qkvpacked_func
-except ImportError as e:
-    flash_attn_qkvpacked_func = None
-
 logger = logging.getLogger(__name__)
 
 
@@ -172,11 +166,6 @@ class BertUnpadSelfAttention(nn.Module):
         self.p_dropout = config.attention_probs_dropout_prob
         self.Wqkv = nn.Linear(self.all_head_size, 3 * config.hidden_size)
 
-        # Warn if defaulting to pytorch because of import issues
-        if flash_attn_qkvpacked_func is None:
-            warnings.warn(
-                'Unable to import Triton; defaulting MosaicBERT attention implementation to pytorch (this will reduce throughput when using this model).'
-            )
 
     def forward(self, hidden_states: torch.Tensor, cu_seqlens: torch.Tensor,
                 max_seqlen_in_batch: int, indices: torch.Tensor,
@@ -210,32 +199,17 @@ class BertUnpadSelfAttention(nn.Module):
                         'b s (t h d) -> b s t h d',
                         t=3,
                         h=self.num_attention_heads)
-        if self.p_dropout or flash_attn_qkvpacked_func is None:
-            # if we have nonzero attention dropout (e.g. during fine-tuning) or no Triton, compute attention in PyTorch
-            q = qkv[:, :, 0, :, :].permute(0, 2, 1, 3)  # b h s d
-            k = qkv[:, :, 1, :, :].permute(0, 2, 3, 1)  # b h d s
-            v = qkv[:, :, 2, :, :].permute(0, 2, 1, 3)  # b h s d
-            attention_scores = torch.matmul(q, k) / math.sqrt(
-                self.attention_head_size)
-            attention_scores = attention_scores + bias
-            attention_probs = nn.functional.softmax(attention_scores, dim=-1)
-            attention_probs = self.dropout(attention_probs)
-            attention = torch.matmul(attention_probs, v).permute(0, 2, 1,
-                                                                 3)  # b s h d
-        else:
-            # Triton implementation only supports 0 attention dropout
-            convert_dtype = qkv.dtype not in [torch.float16, torch.bfloat16]
-            if convert_dtype:
-                # Triton implementation only supports fp16 and bf16
-                orig_dtype = qkv.dtype
-                qkv = qkv.to(torch.float16)
-                bias_dtype = bias.dtype
-                bias = bias.to(torch.float16)
-                attention = flash_attn_qkvpacked_func(qkv, bias)
-                attention = attention.to(orig_dtype)
-                bias = bias.to(bias_dtype)
-            else:
-                attention = flash_attn_qkvpacked_func(qkv, bias)
+        # if we have nonzero attention dropout (e.g. during fine-tuning) or no Triton, compute attention in PyTorch
+        q = qkv[:, :, 0, :, :].permute(0, 2, 1, 3)  # b h s d
+        k = qkv[:, :, 1, :, :].permute(0, 2, 3, 1)  # b h d s
+        v = qkv[:, :, 2, :, :].permute(0, 2, 1, 3)  # b h s d
+        attention_scores = torch.matmul(q, k) / math.sqrt(
+            self.attention_head_size)
+        attention_scores = attention_scores + bias
+        attention_probs = nn.functional.softmax(attention_scores, dim=-1)
+        attention_probs = self.dropout(attention_probs)
+        attention = torch.matmul(attention_probs, v).permute(0, 2, 1,
+                                                                3)  # b s h d
 
         # attn_mask is 1 for attend and 0 for don't
         attention = bert_padding_module.unpad_input_only(
