@@ -469,34 +469,30 @@ def train_transformer(args, model, data_config, train_dataloader, val_dataloader
                                                 [scheduler, args.scheduler],
                                                 train_dataloader, loss_fn, data_config.source_pad_id, data_config.target_pad_id, DEVICE)
         train_loss = torch.tensor(train_loss, device=DEVICE)
-        dist.reduce(train_loss, 0) 
-        train_loss = train_loss / world_size
+
+        dist.reduce(tensor = train_loss, dst = 0, op = torch.distributed.ReduceOp.AVG) 
 
 
         if epoch % args.eval_every == 0 and epoch > 0:
             val_loss =  evaluate_with_notes(ddp_transformer, val_dataloader, loss_fn, data_config.source_pad_id, data_config.target_pad_id, DEVICE)
             pred_trgs, targets =  get_sequences_with_notes(ddp_transformer, val_dataloader, data_config.source_pad_id, target_tokens_to_ids, max_len = 96, DEVICE = DEVICE)
             if pred_trgs:
-                #test_mapk = {f"test_map@{k}": mapk(targets, pred_trgs, k) for k in ks}
                 test_mapk = torch.tensor([mapk(targets, pred_trgs, k) for k in ks], device = DEVICE)
-                #test_recallk = {f"test_recall@{k}": recallTop(targets, pred_trgs, rank = [k])[0] for k in ks}
                 test_recallk = torch.tensor([recallTop(targets, pred_trgs, rank = [k])[0] for k in ks] ,device = DEVICE)
             else:
-                #test_mapk = {f"test_map@{k}": 0.0 for k in ks}
                 test_mapk = torch.zeros(len(ks), device = DEVICE)
-                #test_recallk = {f"test_recall@{k}": 0.0 for k in ks}
                 test_recallk = torch.zeros(len(ks), device = DEVICE)
 
             val_loss = torch.tensor(val_loss, device=DEVICE)
 
-            dist.reduce(val_loss, 0)
-            dist.reduce(test_mapk, 0) 
-            dist.reduce(test_recallk, 0)
+            dist.reduce(tensor = val_loss, dst = 0, op = torch.distributed.ReduceOp.AVG)
+            dist.reduce(tensor = test_mapk, dst = 0, op = torch.distributed.ReduceOp.AVG) 
+            dist.reduce(tensor = test_recallk, dst = 0, op = torch.distributed.ReduceOp.AVG)
 
             if DEVICE == 0:
-                test_mapk = {f"test_map@{k}": test_mapk[i].item()/world_size for i,k in enumerate(ks)}
-                test_recallk = {f"test_recall@{k}": test_recallk[i].item()/world_size for i,k in enumerate(ks)}
-                val_loss = val_loss / world_size
+                test_mapk = {f"test_map@{k}": test_mapk[i].item() for i,k in enumerate(ks)}
+                test_recallk = {f"test_recall@{k}": test_recallk[i].item() for i,k in enumerate(ks)}
+                val_loss = val_loss 
                 wandb.log({"train_loss": train_loss.item(), "val_loss": val_loss.item(), **test_mapk, **test_recallk})
 
         dist.barrier() 
@@ -551,7 +547,7 @@ if __name__ == '__main__':
     parser.add_argument('--use_positional_encoding_notes', type=str, default = 'False', help='Use positional encoding for notes')
     parser.add_argument('--eval_every', type=int, default = 1, help='Evaluate every n epochs')
     parser.add_argument('--ks', type=str, default = '20,40,60', help='Predict notes')
-    parser.add_argument('--num_folds', type=int, default = 10, help='Number of folds for cross validation')
+    parser.add_argument('--num_folds', type=int, default = 20, help='Number of folds for cross validation')
     
     parser.add_argument('--seed', type=int, default = 21333, help='Seed for reproducibility')
 
@@ -653,9 +649,9 @@ if __name__ == '__main__':
             print(f'number of params: {sum(p.numel() for p in transformer.parameters())/1e6 :.2f}M', flush=True)
             wandb.init(
                 # Set the project where this run will be logged
-            project="PTF_SDP_D_NOTES_CROSS_VAL",
+            project="PTF_SDP_D_NOTES_CROSS_VAL_k5_notes",
             config=args,
-            notes="Experiments using cross validation",
+            notes="Experiments using cross validation with mixed precision training",
             tags=["notes","cross_val"])
 
     for fold, (train_idx, val_idx) in enumerate(kf.split(dataset)):
