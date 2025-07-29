@@ -1,122 +1,74 @@
-# packages in environment at /public/conda/Miniconda/envs/pytorch-2.2:
-#
-# Name                    Version                   Build  Channel
-_libgcc_mutex             0.1                        main  
-_openmp_mutex             5.1                       1_gnu  
-asttokens                 2.0.5              pyhd3eb1b0_0  
-blas                      1.0                         mkl  
-bottleneck                1.3.7           py311hf4808d0_0  
-brotli-python             1.0.9           py311h6a678d5_7  
-bzip2                     1.0.8                h5eee18b_5  
-ca-certificates           2024.3.11            h06a4308_0  
-certifi                   2024.2.2        py311h06a4308_0  
-charset-normalizer        2.0.4              pyhd3eb1b0_0  
-cuda-cudart               12.1.105                      0    nvidia
-cuda-cupti                12.1.105                      0    nvidia
-cuda-libraries            12.1.0                        0    nvidia
-cuda-nvrtc                12.1.105                      0    nvidia
-cuda-nvtx                 12.1.105                      0    nvidia
-cuda-opencl               12.4.99                       0    nvidia
-cuda-runtime              12.1.0                        0    nvidia
-decorator                 5.1.1              pyhd3eb1b0_0  
-executing                 0.8.3              pyhd3eb1b0_0  
-ffmpeg                    4.3                  hf484d3e_0    pytorch
-filelock                  3.13.1          py311h06a4308_0  
-freetype                  2.12.1               h4a9f257_0  
-gmp                       6.2.1                h295c915_3  
-gmpy2                     2.1.2           py311hc9b5ff0_0  
-gnutls                    3.6.15               he1e5248_0  
-idna                      3.4             py311h06a4308_0  
-intel-openmp              2023.1.0         hdb19cb5_46306  
-ipython                   8.20.0          py311h06a4308_0  
-jedi                      0.18.1          py311h06a4308_1  
-jinja2                    3.1.3           py311h06a4308_0  
-jpeg                      9e                   h5eee18b_1  
-lame                      3.100                h7b6447c_0  
-lcms2                     2.12                 h3be6417_0  
-ld_impl_linux-64          2.38                 h1181459_1  
-lerc                      3.0                  h295c915_0  
-libcublas                 12.1.0.26                     0    nvidia
-libcufft                  11.0.2.4                      0    nvidia
-libcufile                 1.9.0.20                      0    nvidia
-libcurand                 10.3.5.119                    0    nvidia
-libcusolver               11.4.4.55                     0    nvidia
-libcusparse               12.0.2.55                     0    nvidia
-libdeflate                1.17                 h5eee18b_1  
-libffi                    3.4.4                h6a678d5_0  
-libgcc-ng                 11.2.0               h1234567_1  
-libgomp                   11.2.0               h1234567_1  
-libiconv                  1.16                 h7f8727e_2  
-libidn2                   2.3.4                h5eee18b_0  
-libjpeg-turbo             2.0.0                h9bf148f_0    pytorch
-libnpp                    12.0.2.50                     0    nvidia
-libnvjitlink              12.1.105                      0    nvidia
-libnvjpeg                 12.1.1.14                     0    nvidia
-libpng                    1.6.39               h5eee18b_0  
-libstdcxx-ng              11.2.0               h1234567_1  
-libtasn1                  4.19.0               h5eee18b_0  
-libtiff                   4.5.1                h6a678d5_0  
-libunistring              0.9.10               h27cfd23_0  
-libuuid                   1.41.5               h5eee18b_0  
-libwebp-base              1.3.2                h5eee18b_0  
-llvm-openmp               14.0.6               h9e868ea_0  
-lz4-c                     1.9.4                h6a678d5_0  
-markupsafe                2.1.3           py311h5eee18b_0  
-matplotlib-inline         0.1.6           py311h06a4308_0  
-mkl                       2023.1.0         h213fc3f_46344  
-mkl-service               2.4.0           py311h5eee18b_1  
-mkl_fft                   1.3.8           py311h5eee18b_0  
-mkl_random                1.2.4           py311hdb19cb5_0  
-mpc                       1.1.0                h10f8cd9_1  
-mpfr                      4.0.2                hb69a4c5_1  
-mpmath                    1.3.0           py311h06a4308_0  
-ncurses                   6.4                  h6a678d5_0  
-nettle                    3.7.3                hbbd107a_1  
-networkx                  3.1             py311h06a4308_0  
-numexpr                   2.8.7           py311h65dcdc2_0  
-numpy                     1.26.4          py311h08b1b3b_0  
-numpy-base                1.26.4          py311hf175353_0  
-openh264                  2.1.1                h4ff587b_0  
-openjpeg                  2.4.0                h3ad879b_0  
-openssl                   3.0.13               h7f8727e_0  
-pandas                    2.2.1           py311ha02d727_0  
-parso                     0.8.3              pyhd3eb1b0_0  
-pexpect                   4.8.0              pyhd3eb1b0_3  
-pillow                    10.2.0          py311h5eee18b_0  
-pip                       23.3.1          py311h06a4308_0  
-prompt-toolkit            3.0.43          py311h06a4308_0  
-prompt_toolkit            3.0.43               hd3eb1b0_0  
-ptyprocess                0.7.0              pyhd3eb1b0_2  
-pure_eval                 0.2.2              pyhd3eb1b0_0  
-pygments                  2.15.1          py311h06a4308_1  
-pysocks                   1.7.1           py311h06a4308_0  
-python                    3.11.8               h955ad1f_0  
-python-dateutil           2.8.2              pyhd3eb1b0_0  
-python-tzdata             2023.3             pyhd3eb1b0_0  
-pytorch                   2.2.2           py3.11_cuda12.1_cudnn8.9.2_0    pytorch
-pytorch-cuda              12.1                 ha16c6d3_5    pytorch
-pytorch-mutex             1.0                        cuda    pytorch
-pytz                      2023.3.post1    py311h06a4308_0  
-pyyaml                    6.0.1           py311h5eee18b_0  
-readline                  8.2                  h5eee18b_0  
-requests                  2.31.0          py311h06a4308_1  
-setuptools                68.2.2          py311h06a4308_0  
-six                       1.16.0             pyhd3eb1b0_1  
-sqlite                    3.41.2               h5eee18b_0  
-stack_data                0.2.0              pyhd3eb1b0_0  
-sympy                     1.12            py311h06a4308_0  
-tbb                       2021.8.0             hdb19cb5_0  
-tk                        8.6.12               h1ccaba5_0  
-torchaudio                2.2.2               py311_cu121    pytorch
-torchtriton               2.2.0                     py311    pytorch
-torchvision               0.17.2              py311_cu121    pytorch
-traitlets                 5.7.1           py311h06a4308_0  
-typing_extensions         4.9.0           py311h06a4308_1  
-tzdata                    2024a                h04d1e81_0  
-urllib3                   2.1.0           py311h06a4308_1  
-wcwidth                   0.2.5              pyhd3eb1b0_0  
-wheel                     0.41.2          py311h06a4308_0  
-xz                        5.4.6                h5eee18b_0  
-yaml                      0.2.5                h7b6447c_0  
-zlib                      1.2.13               h5eee18b_0  
-zstd                      1.5.5                hc292b87_0  
+aiohappyeyeballs @ file:///croot/aiohappyeyeballs_1734469393482/work
+aiohttp @ file:///croot/aiohttp_1734687138658/work
+aiosignal @ file:///tmp/build/80754af9/aiosignal_1637843061372/work
+asttokens @ file:///opt/conda/conda-bld/asttokens_1646925590279/work
+attrs @ file:///croot/attrs_1734533101012/work
+Bottleneck @ file:///croot/bottleneck_1707864210935/work
+Brotli @ file:///work/ci_py311/brotli-split_1676830125088/work
+certifi @ file:///home/conda/feedstock_root/build_artifacts/certifi_1746569525376/work/certifi
+charset-normalizer @ file:///tmp/build/80754af9/charset-normalizer_1630003229654/work
+datasets @ file:///croot/datasets_1716911606380/work
+decorator @ file:///opt/conda/conda-bld/decorator_1643638310831/work
+dill @ file:///croot/dill_1715094664823/work
+einops==0.8.1
+executing @ file:///opt/conda/conda-bld/executing_1646925071911/work
+filelock @ file:///croot/filelock_1700591183607/work
+frozenlist @ file:///croot/frozenlist_1730902802621/work
+fsspec @ file:///croot/fsspec_1714461537038/work
+gmpy2 @ file:///work/ci_py311/gmpy2_1676839849213/work
+huggingface_hub @ file:///croot/huggingface_hub_1741284102044/work
+idna @ file:///work/ci_py311/idna_1676822698822/work
+ipython @ file:///croot/ipython_1704833016303/work
+jedi @ file:///work/ci_py311_2/jedi_1679336495545/work
+Jinja2 @ file:///croot/jinja2_1706733616596/work
+joblib @ file:///croot/joblib_1718217211762/work
+MarkupSafe @ file:///croot/markupsafe_1704205993651/work
+matplotlib-inline @ file:///work/ci_py311/matplotlib-inline_1676823841154/work
+mkl-fft @ file:///croot/mkl_fft_1695058164594/work
+mkl-random @ file:///croot/mkl_random_1695059800811/work
+mkl-service==2.4.0
+mpmath @ file:///croot/mpmath_1690848262763/work
+multidict @ file:///croot/multidict_1730905498140/work
+multiprocess @ file:///croot/multiprocess_1692294385131/work
+networkx @ file:///croot/networkx_1690561992265/work
+numexpr @ file:///croot/numexpr_1696515281613/work
+numpy @ file:///croot/numpy_and_numpy_base_1708638617955/work/dist/numpy-1.26.4-cp311-cp311-linux_x86_64.whl#sha256=5f96f274d410a1682519282ae769c877d32fdbf171aa8badec7bf5e1d3a1748a
+packaging @ file:///croot/packaging_1734472117206/work
+pandas @ file:///croot/pandas_1709590491089/work/dist/pandas-2.2.1-cp311-cp311-linux_x86_64.whl#sha256=0a2793a31a0135a35735e1431d453a06186a3a7c607d9b441d9bd5f0fe4ded31
+parso @ file:///opt/conda/conda-bld/parso_1641458642106/work
+pexpect @ file:///tmp/build/80754af9/pexpect_1605563209008/work
+pillow @ file:///croot/pillow_1707233021655/work
+prompt-toolkit @ file:///croot/prompt-toolkit_1704404351921/work
+propcache @ file:///croot/propcache_1744012718189/work
+protobuf @ file:///croot/protobuf_1742419705443/work/bazel-bin/python/dist/protobuf-5.29.3-cp311-abi3-linux_x86_64.whl#sha256=8e447a0e89a4eb6aec01414ffb2b6e0032288e10ce1cf0a8129e73be2c0c34fb
+ptyprocess @ file:///tmp/build/80754af9/ptyprocess_1609355006118/work/dist/ptyprocess-0.7.0-py2.py3-none-any.whl
+pure-eval @ file:///opt/conda/conda-bld/pure_eval_1646925070566/work
+pyarrow @ file:///croot/pyarrow_1738229418212/work/python
+Pygments @ file:///croot/pygments_1684279966437/work
+PySocks @ file:///work/ci_py311/pysocks_1676822712504/work
+python-dateutil @ file:///tmp/build/80754af9/python-dateutil_1626374649649/work
+pytz @ file:///croot/pytz_1695131579487/work
+PyYAML @ file:///croot/pyyaml_1698096049011/work
+regex @ file:///croot/regex_1736540786412/work
+requests @ file:///croot/requests_1707355572290/work
+safetensors @ file:///croot/safetensors_1741361308036/work
+scikit-learn @ file:///croot/scikit-learn_1737988764076/work
+scipy @ file:///croot/scipy_1743153247252/work/dist/scipy-1.15.2-cp311-cp311-linux_x86_64.whl#sha256=2ccc1711fbf2246e7fe52bafe286cce9fa222f297c222954db5caf8bb75e2e58
+six @ file:///tmp/build/80754af9/six_1644875935023/work
+stack-data @ file:///opt/conda/conda-bld/stack_data_1646927590127/work
+sympy @ file:///croot/sympy_1701397643339/work
+threadpoolctl @ file:///croot/threadpoolctl_1719407800858/work
+tokenizers @ file:///croot/tokenizers_1741370336077/work
+torch==2.2.2
+torchaudio==2.2.2
+torchvision==0.17.2
+tqdm @ file:///croot/tqdm_1738943501192/work
+traitlets @ file:///work/ci_py311/traitlets_1676823305040/work
+transformers @ file:///croot/transformers_1741705251010/work
+triton==2.2.0
+typing_extensions @ file:///croot/typing_extensions_1705599297034/work
+tzdata @ file:///croot/python-tzdata_1690578112552/work
+urllib3 @ file:///croot/urllib3_1707770551213/work
+wcwidth @ file:///Users/ktietz/demo/mc3/conda-bld/wcwidth_1629357192024/work
+xxhash @ file:///croot/python-xxhash_1737039434400/work
+yarl @ file:///croot/yarl_1732546845924/work

@@ -1,4 +1,5 @@
 import argparse
+import logging
 import os
 import sys
 import traceback
@@ -13,6 +14,7 @@ import torch.optim.lr_scheduler as lr_scheduler
 import wandb
 import yaml
 from datasets import load_from_disk
+from datasets import table as ds_table
 from sklearn.model_selection import KFold
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader, Dataset, Subset
@@ -21,7 +23,7 @@ from transformers import AutoConfig
 from transformers.models.bert.configuration_bert import BertConfig
 
 from model import Seq2SeqTransformerWithNotes
-from utils.bert_embeddings import MosaicBertForEmbeddingGeneration
+from utils.bert_embeddings import MosaicBertForEmbeddingGenerationHF
 from utils.eval import mapk, recallTop
 from utils.train import (
     WarmupStableDecay,
@@ -35,6 +37,8 @@ from utils.utils import (
     load_data,
 )
 
+from datetime import timedelta
+
 # currently getting warnings because of mask datatypes, you might wanna change this not installing from environment.yml
 
 # train_batch_size = 128, eval_batch_size = 128, num_workers = 5,pin_memory = True
@@ -42,7 +46,14 @@ from utils.utils import (
 
 def setup(rank, world_size):
     # initialize the process group
-    dist.init_process_group("nccl", rank=rank, world_size=world_size)
+    dist.init_process_group(
+        backend="nccl",
+        init_method="env://",
+        world_size=world_size,
+        rank=rank,
+        timeout=timedelta(seconds=1800)
+    )
+    torch.cuda.set_device(rank % torch.cuda.device_count())
 
 
 @dataclass
@@ -570,29 +581,17 @@ def train_epoch_with_notes(
 
 
 def get_model(
-    pretrained_model_name: str = "bert-base-uncased",
-    model_config: Optional[dict] = None,
-    pretrained_checkpoint: Optional[str] = None,
-    num_embedding_layers: int = 4,
-    strategy="concat",
-    seq_len=512,
+    pretrained_model_name: str,
+    num_embedding_layers: int,
+    strategy: str,
 ):
-
-    model_config, unused_kwargs = BertConfig.get_config_dict(model_config)
-    model_config.update(unused_kwargs)
-
-    config, unused_kwargs = AutoConfig.from_pretrained(
-        pretrained_model_name, return_unused_kwargs=True, **model_config
-    )
-    # This lets us use non-standard config fields (e.g. `starting_alibi_size`)
-    config.update(unused_kwargs)
-    config.num_embedding_layers = num_embedding_layers
-    config.strategy = strategy
-    config.seq_len = seq_len
-    model = MosaicBertForEmbeddingGeneration.from_pretrained(
-        pretrained_checkpoint=pretrained_checkpoint, config=config
-    )
-
+    from transformers import AutoModel
+    pretrained_model = AutoModel.from_pretrained(pretrained_model_name, trust_remote_code=True)
+    # Set custom attributes in the config
+    pretrained_model.config.num_embedding_layers = num_embedding_layers
+    pretrained_model.config.strategy = strategy
+    # Create the custom embedding model
+    model = MosaicBertForEmbeddingGenerationHF(pretrained_model=pretrained_model)
     return model
 
 
@@ -715,6 +714,11 @@ def train_transformer(
                         **test_recallk,
                     }
                 )
+                logging.info(
+                    f"Epoch {epoch}: Train Loss: {train_loss.item():.4f}, "
+                    f"Val Loss: {val_loss.item():.4f}, "
+                    f"MAP: {test_mapk}, Recall: {test_recallk}"
+                )
 
         dist.barrier()
         if isinstance(scheduler, lr_scheduler.ReduceLROnPlateau):
@@ -726,15 +730,18 @@ def train_transformer(
     else:
         return None, None
 
+# 2) override it so any old‐path gets rewritten
+def _patched_mm(path):
+        # replace the old absolute prefix with your current one:
+        path = path.replace(
+            "/home/sifal.klioui/final_tokenized_reindex_hadm",
+            "/home/rayane.aliouane/PatientTrajectoryForecasting/final_tokenized_reindex_hadm",
+        )
+        return _orig_mm(path)
 
 if __name__ == "__main__":
 
-    PRETRAINED_MODEL_CHECKPOINT = os.path.join(
-        "bert_mimic_model_512/step_80000", "pytorch_model.bin"
-    )
-    PRETRAINED_MODEL_NAME = "mosaicml/mosaic-bert-base-seqlen-512"
-    MODEL_CONFIG = "mosaicml/mosaic-bert-base-seqlen-512"
-
+    PRETRAINED_MODEL_NAME = "Sifal/ClinicalMosaic"
     parser = argparse.ArgumentParser(description="CLI for wandb sweep parameters")
 
     # Fixed value parameters
@@ -818,7 +825,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--strategy",
         type=str,
-        default="concat",
+        default="mean",
         help="Strategy for embedding generation",
     )
     parser.add_argument(
@@ -865,7 +872,7 @@ if __name__ == "__main__":
         args.use_positional_encoding_notes = False
         print("Not using positional encoding for notes")
 
-    seed = enforce_reproducibility(seed=args.seed)
+    seed = enforce_reproducibility(use_seed=args.seed)
 
     if args.mixed_precision:
         torch.set_float32_matmul_precision("high")
@@ -873,7 +880,7 @@ if __name__ == "__main__":
     config = Config()
     data_config = DataConfig()
 
-    world_size = int(os.environ["WORLD_SIZE"])
+    world_size = int(os.environ["SLURM_NTASKS"])
     rank = int(os.environ["SLURM_PROCID"])
     gpus_per_node = int(os.environ["SLURM_GPUS_ON_NODE"])
 
@@ -893,7 +900,7 @@ if __name__ == "__main__":
 
     print(f"host: {gethostname()}, rank: {rank}, local_rank: {local_rank}")
 
-    with open("PatientTrajectoryForecasting/paths.yaml", "r") as file:
+    with open("paths.yaml", "r") as file:
         path_config = yaml.safe_load(file)
 
     train_data_path = get_paths(
@@ -926,7 +933,12 @@ if __name__ == "__main__":
     data_config.target_pad_id = target_tokens_to_ids["PAD"]
     data_config.source_pad_id = source_tokens_to_ids["PAD"]
 
-    # Load the datasets
+     # 1) stash the original loader
+    _orig_mm = ds_table._memory_mapped_arrow_table_from_file
+
+    ds_table._memory_mapped_arrow_table_from_file = _patched_mm
+
+    # 3) now load — the monkey‐patch will transparently fix every shard‐path
     dataset = torch.load("final_dataset/dataset.pth")
 
     ks = [int(k) for k in args.ks.split(",")]
@@ -937,12 +949,10 @@ if __name__ == "__main__":
     cumulative_recallk = {f"test_recall@{k}": 0.0 for k in ks}
 
     bert_model = get_model(
-        pretrained_model_name=PRETRAINED_MODEL_NAME,
-        model_config=MODEL_CONFIG,
-        pretrained_checkpoint=PRETRAINED_MODEL_CHECKPOINT,
-        num_embedding_layers=args.num_embedding_layers,
-        strategy=args.strategy,
-    )
+    pretrained_model_name=PRETRAINED_MODEL_NAME,
+    num_embedding_layers=args.num_embedding_layers,
+    strategy=args.strategy,
+)
 
     transformer = Seq2SeqTransformerWithNotes(
         num_encoder_layers=args.num_encoder_layers,
@@ -973,6 +983,16 @@ if __name__ == "__main__":
             notes="Experiments using cross validation",
             tags=["notes", "cross_val"],
         )
+        print("Initialized wandb")
+        # Create logs directory if it doesn't exist
+        os.makedirs("logs", exist_ok=True)
+        logging.basicConfig(
+            filename="logs/training.log",
+            filemode="a",  # or "w" to overwrite each time
+            format="%(asctime)s - %(levelname)s - %(message)s",
+            level=logging.INFO,
+        )
+        print("Initialized file logging")
 
     for fold, (train_idx, val_idx) in enumerate(kf.split(dataset)):
         dist.barrier()
@@ -1043,6 +1063,10 @@ if __name__ == "__main__":
                             / (fold + 1),
                         }
                     )
+                    logging.info(
+                        f"Fold {fold}, k={k}: test_map = {test_mapk_cfv[f'test_map@{k}']:.4f}, "
+                        f"test_recall = {test_recallk_cfv[f'test_recall@{k}']:.4f}"
+                    )
 
         except Exception as e:
             if local_rank == 0:
@@ -1057,6 +1081,10 @@ if __name__ == "__main__":
                         "traceback": tcb,
                     }
                 )
+                
+                logging.error(f"Exception occurred: {e}")
+                logging.error(f"Traceback:\n{tcb}")
+                
                 wandb.finish()
                 exit(1)
             dist.destroy_process_group()
