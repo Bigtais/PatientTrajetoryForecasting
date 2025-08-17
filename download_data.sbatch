@@ -1,11 +1,9 @@
 #!/bin/bash
 #SBATCH --job-name=Patient_Traj_Pred
-#SBATCH --partition=gpu
+#SBATCH --partition=all
 #SBATCH --nodes=1 # Use 1 node to avoid comm overhead stinky af
-#SBATCH --ntasks-per-node=7 # must match the number of GPUs
-#SBATCH --gres=gpu:1     # must match this
 #SBATCH --cpus-per-task=5
-#SBATCH --time=00:10:00
+#SBATCH --time=02:00:00
 #SBATCH --output=output_logs/stdout/stdout_%j.out
 #SBATCH --error=output_logs/stderr/stderr_%j.err
 
@@ -23,4 +21,4 @@ export WORLD_SIZE=$SLURM_NTASKS
 export CUDA_VISIBLE_DEVICES=$SLURM_LOCALID
 
 # Run the Python script with srun
-srun python dataset_load.py
+srun python download_data.py

@@ -4,8 +4,8 @@
 #SBATCH --gres=gpu:a40-48:1
 #SBATCH --cpus-per-task=8
 #SBATCH --time=7-00:00:00
-#SBATCH --output=stdout.out
-#SBATCH --error=stderr.out
+#SBATCH --output=output_logs/stdout/stdout.out
+#SBATCH --error=output_logs/stderr/stderr.out
 
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate pytorch-2.2

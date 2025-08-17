@@ -6,8 +6,8 @@
 #SBATCH --gres=gpu:3     # must match this
 #SBATCH --cpus-per-task=5
 #SBATCH --time=7-00:00:00
-#SBATCH --output=stdout_%j.out
-#SBATCH --error=stderr_%j.err
+#SBATCH --output=output_logs/stdout/stdout_%j.out
+#SBATCH --error=output_logs/stderr/stderr_%j.err
 
 # Load Conda environment
 source ~/miniconda3/etc/profile.d/conda.sh
