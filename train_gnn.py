@@ -181,34 +181,38 @@ def main():
 
             for batch in train_loader:
                 batch = batch.to(device, non_blocking=True)
-
                 optimizer.zero_grad(set_to_none=True)
 
-                # Forward pass only on sampled subgraph
-                out = ddp_model(batch.x, batch.edge_index, batch.edge_type)  # shape [num_nodes_subgraph, D]
+                # Forward on sampled subgraph only
+                out = ddp_model(batch.x, batch.edge_index, batch.edge_type)  # [N_sub, D]
 
-                # Map batch triples to subgraph node indices
-                n_id = batch.n_id.to(device)  # global IDs of nodes in this batch
-                id_map = {nid.item(): i for i, nid in enumerate(n_id)}
+                # ---- FAST vectorized mapping from global -> local ----
+                n_id = batch.n_id.to(device)                       # global node IDs in this subgraph
+                Nsub = n_id.size(0)
+                global2local = torch.full((num_entities,), -1, device=device, dtype=torch.long)
+                global2local[n_id] = torch.arange(Nsub, device=device)
 
-                # Collect positive triples inside this batch
-                pos_triples = []
-                for (h, r, t) in triplets_id:  # or train_triples tensor
-                    if h in id_map and t in id_map:
-                        pos_triples.append([id_map[h], r, id_map[t]])
-                if not pos_triples:
+                # Use *train* triples only, mapped into local indices
+                tt = train_triples.to(device)                      # [T, 3] (h, r, t)
+                h_local = global2local[tt[:, 0]]
+                t_local = global2local[tt[:, 2]]
+                mask = (h_local != -1) & (t_local != -1)
+                if not mask.any():
                     continue
-                pos_triples = torch.tensor(pos_triples, dtype=torch.long, device=device)
 
-                # Negative sampling
+                pos_triples = torch.stack([h_local[mask], tt[mask, 1], t_local[mask]], dim=1)  # [B, 3]
+
+                # ---- Negative sampling within the subgraph ----
                 bsz = pos_triples.size(0)
-                random_tails = torch.randint(0, len(n_id), (bsz,), device=device)
-                mask = random_tails == pos_triples[:, 2]
-                if mask.any():
-                    random_tails[mask] = torch.randint(0, len(n_id), (int(mask.sum().item()),), device=device)
+                random_tails = torch.randint(0, Nsub, (bsz,), device=device)
+                # ensure negatives differ from true local tail
+                coll = random_tails == pos_triples[:, 2]
+                if coll.any():
+                    random_tails[coll] = torch.randint(0, Nsub, (int(coll.sum().item()),), device=device)
+
                 neg_triples = torch.stack([pos_triples[:, 0], pos_triples[:, 1], random_tails], dim=1)
 
-                # Score with subgraph embeddings
+                # Scores with subgraph embeddings
                 rel_w = ddp_model.module.relation_weights()
                 pos_scores = scorer.score(out, rel_w, pos_triples)
                 neg_scores = scorer.score(out, rel_w, neg_triples)
@@ -217,7 +221,9 @@ def main():
                 loss.backward()
                 optimizer.step()
 
-
+                # track losses properly
+                total_loss_local += float(loss.item()) * bsz
+                seen_local += int(bsz)
 
             total_loss_tensor = torch.tensor(total_loss_local, device=device)
             seen_tensor = torch.tensor(seen_local, device=device)

@@ -3,7 +3,7 @@
 #SBATCH --partition=gpu
 #SBATCH --nodes=1                 # Single node
 #SBATCH --ntasks=1                # Only one task (torchrun handles multi-proc)
-#SBATCH --gres=gpu:a40-48:5
+#SBATCH --gres=gpu:a40-48:5       # If possible, use more gpus but only of this type (others have too little vram)
 #SBATCH --cpus-per-task=5
 #SBATCH --time=7-00:00:00
 #SBATCH --output=output_logs/stdout/stdout_%j.out
